@@ -16,6 +16,7 @@
 /*
 更新履歴
 
+2024/10/25  0.24.0  @startpoint @breakの色分けが適用されるようにした。
                     GUIv3がAIのべりすとサイト上の設定からも消えているので、関連コードを削除。
                     サイドメニュー表示の時の禁止ワード除外リスト・適用中の禁止ワードとバイアスの表の幅がメニューの幅を超過していた不具合を修正。
 2024/06/17  0.23.5  GUIv2：使用可能文字の判定処理にモデルがnext-previewの場合を追加。
@@ -526,6 +527,9 @@
         //orig_text = orig_text.replace(/@endpoint(?!.*?@endpoint.*?)(.*?)(<br>)*$/i, '<font color=\"#aaaaaa\">@endpoint$1</font>');
         orig_text = orig_text.replace(/@endpoint(.*?)(<br>)*$/i, '<font color=\"#aaaaaa\">@endpoint$1</font>');
 
+        // startpointもしくはbreakより前の文章は色を変える(テスト機能)
+        orig_text = orig_text.replace(/(^.*@startpoint)/, '<font color=\"#aaaaaa\">$1</font>');
+        orig_text = orig_text.replace(/(^.*@break)/, '<font color=\"#aaaaaa\">$1</font>');
         // テキストカラータグを元に戻す
         if ( tagreplace == 2) {
             orig_text = orig_text.replace(/__TXTC_S__ class="textcolor_(.*?)"__TXT_SE__(.*?)__TXTC_E__/gi, "&lt;f color$1&gt;$2&lt;/f&gt;");

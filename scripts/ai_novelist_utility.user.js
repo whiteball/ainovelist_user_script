@@ -17,6 +17,7 @@
 更新履歴
 
                     GUIv3がAIのべりすとサイト上の設定からも消えているので、関連コードを削除。
+                    サイドメニュー表示の時の禁止ワード除外リスト・適用中の禁止ワードとバイアスの表の幅がメニューの幅を超過していた不具合を修正。
 2024/06/17  0.23.5  GUIv2：使用可能文字の判定処理にモデルがnext-previewの場合を追加。
 2024/05/19  0.23.4  GUIv2：スーパーとりんさまのバリエーション（カラフル・ソリッド）で使用可能文字の判定などが通常とりんさま相当になってしまう不具合を修正。
 2023/11/29  0.23.3  GUIv2：サイドメニューが有効なときは、履歴が横から出てくるボタンを表示しないようにした。
@@ -1129,7 +1130,7 @@
             select_history_side.id = 'show-history-select-side'
             document.getElementsByTagName('head')[0].insertAdjacentHTML('beforeend', `<style type="text/css">
 #send-ban-word-confirm, #send-bias-confirm {
-    width: 85vw;
+    width: 85%;
     margin-top: 1rem;
 }
 #send-ban-word-confirm div, #send-bias-confirm div {
@@ -1164,7 +1165,7 @@
             document.getElementById('options_goodies').insertAdjacentHTML('afterend', `<div id="options_usermod_text" style="display: none;"><dl id="acMenu">
 <dt><div class="header2" style="padding:0px;"><h3 style="padding-left:15px;">▼　送信テキスト確認(ユーザースクリプト)</h3></div></dt>
 <dd class="dd-margin" style="margin-top: 15px;` + style + `display: block;">
-<div style="max-width:90%; color:#777777;width:85vw" class="explanations"><div style="float:left;text-align:left">最後にAIに送信した入力テキスト内容・禁止ワード・バイアスを確認できます。</div><div style="float:none;text-align:right" id="options_usermod_text_count"></div></div>
+<div style="max-width:90%; color:#777777" class="explanations"><div style="float:left;text-align:left">最後にAIに送信した入力テキスト内容・禁止ワード・バイアスを確認できます。</div><div style="float:none;text-align:right" id="options_usermod_text_count"></div></div>
 <textarea id="send-text-confirm" rows="30" readOnly></textarea>
 <div id="send-ban-word-confirm"></div><div id="send-bias-confirm"></div></dd></dl></div>
 <div id="options_usermod_history" style="display: none;"><dl id="acMenu">
@@ -1475,7 +1476,7 @@
 <span id="tooltips">
 <span data-text="この設定で指定された単語に完全一致する禁止ワードを、サーバー送信対象から除外します。禁止ワードリストやキャラクターブックの@addbanwordで追加された禁止ワードの他、システムが追加する禁止ワードも除外可能です。&lt;br&gt;除外ワードの書式は禁止ワードリストと同じく、改行か&lt;&lt;|&gt;&gt;で各単語を区切ってください。&lt;br&gt;※除外リストはすべての作品で共通です。" id="help_mod_anti_ban_words"><img src="images/icon_popup.png" width="20" height="20" id="help_mod_anti_ban_words_icon" class="help_popup" style="margin-left:10px; margin-top: -5px; vertical-align:middle;" aria-describedby="tooltip_mod_anti_ban_words_icon" onclick="return false;"></span>
 </span></h4>
-<textarea id="mod_anti_ban_words" style="width:85vw" rows="4"></textarea>
+<textarea id="mod_anti_ban_words" style="width:85%" rows="4"></textarea>
 </dd></dl>` : ''))
     // メニュー開閉
     window.jQuery('#mod_user_script_menu').on('click', function() {

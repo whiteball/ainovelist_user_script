@@ -262,6 +262,7 @@
                         .replace(/(<br>)*<span[^>]*>/g, '')
                         .replace(/<\/span>/g, '')
                         .replace(/<font color="#aaaaaa"[^>]*>/g, '')
+                        .replace(/<font class="textcolor_ai"[^>]*>/g, '')
                         .replace(/<\/font>/g, '')
                 }
                 cache = removeTag(cache)

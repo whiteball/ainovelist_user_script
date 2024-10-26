@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AIのべりすとユーティリティ
 // @namespace    https://ai-novelist-share.geo.jp/
-// @version      0.23.5
+// @version      0.24.0
 // @description  「Ctrl+/」で選択範囲の行の上下に「@/*」と「@*/」を追加/削除する機能と、リトライ・Undo・Redoする前に確認ダイアログを出す機能と、本文入力欄の分割を複数文コメントや最新の出力文(色の変わっている部分)の途中になるのを避ける機能と、@endpointの前に出力するときは@endpointの位置にスクロールする機能と、Redoを3回押した時にもUndo履歴を挿入する機能と、サーバーに送信するテキストを確認する機能と、最大20回分まで過去の出力テキストの履歴を確認する機能と、トークンとして読み取れない文字をハイライトする機能と、特定の文字を含むトークンを検索できる機能と、選択テキストを任意のサイトで検索する機能と、本文に画像を挿入する機能と、編集ページを開いてからの出力数カウント表示などを追加します。※Chrome/Firefoxで動作確認
 // @author       しらたま
 // @match        https://ai-novel.com/novel.php
@@ -11,6 +11,8 @@
 // @supportURL   https://gist.github.com/whiteball/b2bf1b71e37a07c87bb3948ea6f0f0f8
 // @require      https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js
 // @grant        none
+// @tag          ai-novelist
+// @tag          utilities
 // ==/UserScript==
 
 /*
@@ -20,7 +22,10 @@
                     AI出力の色表示を残す設定にしているのに、その色が消えてしまう不具合を修正。
                     GUIv3がAIのべりすとサイト上の設定からも消えているので、関連コードを削除。
                     サイドメニュー表示の時の禁止ワード除外リスト・適用中の禁止ワードとバイアスの表の幅がメニューの幅を超過していた不具合を修正。
+                    出力文字数のカウントで改行が4文字としてカウントされていた不具合を修正。
+                    @endpointがあっても末尾に挿入する機能が動いていなかった不具合を修正。
                     シャーディング(本文の分割)境界の調整機能を全面的に書き換え。ひとかたまりのAI出力の途中に境界が来ても、できるだけ色分けが失われないようにした。
+                    AI出力色を残す場合に、その色分けタグにタイムスタンプを仕込むようにした。
 2024/06/17  0.23.5  GUIv2：使用可能文字の判定処理にモデルがnext-previewの場合を追加。
 2024/05/19  0.23.4  GUIv2：スーパーとりんさまのバリエーション（カラフル・ソリッド）で使用可能文字の判定などが通常とりんさま相当になってしまう不具合を修正。
 2023/11/29  0.23.3  GUIv2：サイドメニューが有効なときは、履歴が横から出てくるボタンを表示しないようにした。
@@ -848,82 +853,164 @@
     // @endpointの直前に改行がないと動きません
     // PushHistoryが基本的に最新出力文挿入後にしか呼ばれないため、無理矢理割り込んでいます
     const originalPushHistory = window.PushHistory
+    /** @param {string} data */
     window.PushHistory = function (data) {
-        let start = data.lastIndexOf('<span id="ai_output"'), end = data.indexOf('</span>', start)
-        if (start >= 0 && end >= 0) {
-            // 出力した後
-            end += '</span>'.length
-            const output = data.slice(start, end)
-            const ai = document.getElementById('ai_output')
-            if (ai.parentNode.tagName.toLowerCase() === 'font') {
-                const next_br = ai.nextSibling
-                if (!!pref.force_insert_last) {
-                    ai.parentNode.removeChild(next_br)
-                    document.querySelector('#data_container > div:last-child').insertAdjacentElement('beforeend', ai)
-                } else {
-                    const target = ai.parentNode
-                    // @endpointがシャーディング境界にある、かつ、先頭のシャーディングではない場合は、一つ前のシャーディングの最後に追加する
-                    if (target.previousElementSibling === null && target.parentNode.previousElementSibling !== null) {
-                        target.parentNode.previousElementSibling.insertAdjacentElement('beforeend', ai)
-                    } else {
-                        target.insertAdjacentElement('beforebegin', ai)
+        let output = ''
+        if (getOutputType() === OUTPUT_TYPE_TEXTCOLOR_AI) {
+            const pos = data.indexOf('@endpoint')
+            let start = data.lastIndexOf('<font class="textcolor_ai"', pos === -1 ? +Infinity : pos), end = data.indexOf('</font>', start)
+            if (start >= 0 && end >= 0) {
+                // 出力した後
+                end += '</font>'.length
+                let aiFixed
+                const last_result = window.GetResultHistory(-1, false)
+                for (const ai of [...document.getElementById('data_container').getElementsByClassName('textcolor_ai')].reverse()) {
+                    if (ai.innerHTML === last_result) {
+                        output = last_result
+                        aiFixed = ai
+                        // AI出力にタイムスタンプを付ける
+                        // シャーディングの兼ね合いで分割することがあるので、分割しても元は一つだとわかりやすくするため
+                        ai.setAttribute('data-timestamp', Date.now())
+
+                        // if (ai.parentNode.tagName === 'DIV' && ai.parentNode.id.toLowerCase() === 'data_edit') {
+                        if (ai.parentElement.tagName === 'FONT' && ai.parentElement.parentElement.id.toLowerCase() === 'data_edit') {
+                            const next_br = ai.nextSibling
+                            if (!!pref.force_insert_last) {
+                                // ai.parentNode.removeChild(next_br)
+                                const before = ai.previousSibling, after = ai.nextSibling
+                                document.querySelector('#data_container > div:last-child').insertAdjacentElement('beforeend', ai)
+                                if (before && before.tagName && before.tagName === 'HR') {
+                                    ai.insertAdjacentElement('beforebegin', before)
+                                }
+                                if (after && after.tagName && after.tagName === 'HR') {
+                                    ai.insertAdjacentElement('afterend', after)
+                                }
+                            }
+                            else {
+                                const target = ai.parentNode, ai_prev = ai.previousSibling, ai_next = ai.nextSibling
+                                // @endpointがシャーディング境界にある、かつ、先頭のシャーディングではない場合は、一つ前のシャーディングの最後に追加する
+                                if (target.previousElementSibling === null && target.parentNode.previousElementSibling !== null) {
+                                    target.parentNode.previousElementSibling.insertAdjacentElement('beforeend', ai)
+                                } else {
+                                    target.insertAdjacentElement('beforebegin', ai)
+                                }
+                                if (next_br && next_br.nodeType === Node.ELEMENT_NODE && next_br instanceof Element && next_br.tagName === 'BR') {
+                                    // 出力の次の改行を移動する
+                                    ai.insertAdjacentElement('afterend', next_br)
+                                    if (ai.previousSibling && ai.previousSibling.nodeType === Node.ELEMENT_NODE && ai.previousSibling instanceof Element && ai.previousSibling.tagName === 'BR') {
+                                        // 移動後の出力の直前が改行なら取り除く
+                                        ai.parentNode.removeChild(ai.previousSibling)
+                                    }
+                                } else if ((ai_prev && ai_prev.nodeType === Node.ELEMENT_NODE && ai_prev instanceof Element && ai_prev.tagName === 'HR')
+                                    && (ai_next && ai_next.nodeType === Node.ELEMENT_NODE && ai_next instanceof Element && ai_next.tagName === 'HR')) {
+                                    // 出力の前後がhrならそれらを移動する
+                                    ai.insertAdjacentElement('beforebegin', ai_prev)
+                                    // 後ろのhrの次は改行になっているのでそれも移動
+                                    const temp_br = ai_next.nextElementSibling
+                                    ai.insertAdjacentElement('afterend', ai_next)
+                                    ai_next.insertAdjacentElement('afterend', temp_br)
+                                    if (ai_prev.previousSibling && ai_prev.previousSibling.nodeType === Node.ELEMENT_NODE && ai_prev.previousSibling instanceof Element && ai_prev.previousSibling.tagName === 'BR') {
+                                        // 移動後の出力の直前が改行なら取り除く
+                                        ai_prev.parentNode.removeChild(ai_prev.previousSibling)
+                                    }
+                                }
+                            }
+                            window.CopyContent()
+                            data = localStorage.textdata
+                        }
+                        break;
                     }
-                    ai.insertAdjacentElement('afterend', next_br)
-                    if (ai.previousSibling && ai.previousSibling.tagName && ai.previousSibling.tagName.toLowerCase() === 'br') {
-                        ai.parentNode.removeChild(ai.previousSibling)
+                }
+                if (aiFixed) {
+                    const temp_output_html = applyInsertImage(aiFixed.innerHTML)
+                    if (aiFixed.innerHTML !== temp_output_html) {
+                        aiFixed.innerHTML = temp_output_html
+                    }
+                }
+            }
+        } else {
+            let start = data.lastIndexOf('<span id="ai_output"'), end = data.indexOf('</span>', start)
+            if (start >= 0 && end >= 0) {
+                // 出力した後
+                end += '</span>'.length
+                output = data.slice(start, end)
+                const ai = document.getElementById('ai_output')
+                if (ai.parentElement.tagName.toLowerCase() === 'font') {
+                    const next_br = ai.nextSibling
+                    if (!!pref.force_insert_last) {
+                        // ai.parentNode.removeChild(next_br)
+                        document.querySelector('#data_container > div:last-child').insertAdjacentElement('beforeend', ai)
+                    }
+                    else {
+                        const target = ai.parentNode
+                        // @endpointがシャーディング境界にある、かつ、先頭のシャーディングではない場合は、一つ前のシャーディングの最後に追加する
+                        if (target.previousElementSibling === null && target.parentNode.previousElementSibling !== null) {
+                            target.parentNode.previousElementSibling.insertAdjacentElement('beforeend', ai)
+                        } else {
+                            target.insertAdjacentElement('beforebegin', ai)
+                        }
+                        if (next_br && next_br.nodeType === Node.ELEMENT_NODE && next_br instanceof Element && next_br.tagName === 'BR') {
+                            ai.insertAdjacentElement('afterend', next_br)
+                        }
+                        if (ai.previousSibling && ai.previousSibling instanceof Element && ai.previousSibling.tagName === 'BR') {
+                            ai.parentNode.removeChild(ai.previousSibling)
+                        }
                     }
                 }
                 window.CopyContent()
                 data = localStorage.textdata
-            }
-            const temp_output_html = applyInsertImage(ai.innerHTML)
-            if (ai.innerHTML !== temp_output_html) {
-                ai.innerHTML = temp_output_html
-            }
-            if (output !== '') {
-                endpointScroll()
-                // 情報表示のためのカウント
-                totalOutputCount++
-                if (window.retry) {
-                    totalRetryCount++
+                const temp_output_html = applyInsertImage(ai.innerHTML)
+                if (ai.innerHTML !== temp_output_html) {
+                    ai.innerHTML = temp_output_html
                 }
-                totalOutputChar += output.replace(/<span[^>]*>/g, '').replace(/<\/span>/g, '').length
-                UpdateModInfo()
+            }
+        }
 
-                // 特殊なスクリプト(置換)
-                const memory = document.getElementById('memory'),
-                    authorsnote = document.getElementById('authorsnote')
-                let needCopyContent = false
-                for (let i = 0; i < 100; i++) {
-                    const script_selector = document.getElementById('script_selector' + i)
-                    if (script_selector && script_selector.value === 'script_none') {
-                        const script_in = document.getElementById('script_in' + i)
-                        let target
-                        if (script_in && script_in.value.indexOf('(?:M){0}') === 0) {
-                            target = memory
-                        } else if (script_in && script_in.value.indexOf('(?:A){0}') === 0) {
-                            target = authorsnote
-                        } else {
-                            continue
+        if (output !== '') {
+            endpointScroll()
+            // 情報表示のためのカウント
+            totalOutputCount++
+            if (window.retry) {
+                totalRetryCount++
+            }
+            totalOutputChar += output.replace(/<span[^>]*>/g, '').replace(/<\/span>/g, '')
+                .replace(/<font class="textcolor_ai"[^>]*>/g, '').replace(/<\/font>/g, '')
+                .replace(/<br>/g, "\n").length
+            UpdateModInfo()
+
+            // 特殊なスクリプト(置換)
+            const memory = document.getElementById('memory'),
+                authorsnote = document.getElementById('authorsnote')
+            let needCopyContent = false
+            for (let i = 0; i < 100; i++) {
+                const script_selector = document.getElementById('script_selector' + i)
+                if (script_selector && script_selector.value === 'script_none') {
+                    const script_in = document.getElementById('script_in' + i)
+                    let target
+                    if (script_in && script_in.value.indexOf('(?:M){0}') === 0) {
+                        target = memory
+                    } else if (script_in && script_in.value.indexOf('(?:A){0}') === 0) {
+                        target = authorsnote
+                    } else {
+                        continue
+                    }
+                    const script_out = document.getElementById('script_out' + i)
+                    let script_out_text = script_out.value
+                    const regexp_in = new RegExp(script_in.value)
+                    const result_in = regexp_in.exec(output.replace(/<br>/gi, "\n").replace(/<\/?[^>]+>/gi, ''))
+                    if (result_in !== null) {
+                        for (let j = 1; j < result_in.length; j++) {
+                            script_out_text = script_out_text.replace('#' + j + '#', result_in[j])
                         }
-                        const script_out = document.getElementById('script_out' + i)
-                        let script_out_text = script_out.value
-                        const regexp_in = new RegExp(script_in.value)
-                        const result_in = regexp_in.exec(output.replace(/<br>/gi, "\n").replace(/<\/?[^>]+>/gi, ''))
-                        if (result_in !== null) {
-                            for (let j = 1; j < result_in.length; j++) {
-                                script_out_text = script_out_text.replace('#' + j + '#', result_in[j])
-                            }
-                            const [script_out_before, script_out_after] = script_out_text.split('<|>')
-                            const regexp_out = new RegExp(script_out_before)
-                            target.value = target.value.replace(regexp_out, script_out_after)
-                            needCopyContent = true
-                        }
+                        const [script_out_before, script_out_after] = script_out_text.split('<|>')
+                        const regexp_out = new RegExp(script_out_before)
+                        target.value = target.value.replace(regexp_out, script_out_after)
+                        needCopyContent = true
                     }
                 }
-                if (needCopyContent) {
-                    window.CopyContent()
-                }
+            }
+            if (needCopyContent) {
+                window.CopyContent()
             }
         }
         originalPushHistory(data)

@@ -17,6 +17,7 @@
 更新履歴
 
 2024/10/25  0.24.0  @startpoint @breakの色分けが適用されるようにした。
+                    AI出力の色表示を残す設定にしているのに、その色が消えてしまう不具合を修正。
                     GUIv3がAIのべりすとサイト上の設定からも消えているので、関連コードを削除。
                     サイドメニュー表示の時の禁止ワード除外リスト・適用中の禁止ワードとバイアスの表の幅がメニューの幅を超過していた不具合を修正。
 2024/06/17  0.23.5  GUIv2：使用可能文字の判定処理にモデルがnext-previewの場合を追加。
@@ -462,6 +463,13 @@
         ' ': t, '　': t, '／': t, '＼': t, '＊': t, '．': t, '？': t, '！': t, '（': t, '）': t, '【': t, '】': t, '［': t, '］': t, '｛': t, '｝': t, '＜': t, '＞': t, '：': t, '…': t, '”': t, '＄': t, '％': t, '＆': t, '’': t, '＠': t, '＊': t, '＾': t, '＝': t, '｜': t, '；': t, '＋': t, '＿': t, '゛': t, '～': t, '－': t,
     }
     // 本文入力欄の分割を複数文コメントや最新の出力文(色の変わっている部分)の途中になるのを避ける機能
+    /**
+     * 
+     * @param {string|null} orig_text 
+     * @param {boolean} nospan 
+     * @param {boolean} noscroll 
+     * @param {Number} tagreplace 
+     */
     window.TextSharding = function (orig_text = null, nospan = true, noscroll = false, tagreplace = 0) {
         let $ = window.jQuery
         if (!orig_text) {
@@ -493,8 +501,15 @@
         // テキストカラーの置換回避処理
         for (i = 1; i < 4; i++) {
           const tar_tag = new RegExp ("<font( class=\"textcolor_"+i+"\".*?)>(.*?)</font>", "gi" );
-          const reb_reg = "__TXTC_S__$1__TXT_SE__$2__TXTC_E__"
+          const reb_reg = "__TXTC_S__$1__TXTC_SE__$2__TXTC_E__"
           orig_text = orig_text.replace( tar_tag, reb_reg );
+        }
+
+        // 装飾用AIカラーの置換回避
+        {
+            const tar_tag = new RegExp ("<font( class=\"textcolor_ai\".*?)>(.*?)</font>", "gi" );
+            const reb_reg = "__TXTC_S__$1__TXTC_SE__$2__TXTC_E__"
+            orig_text = orig_text.replace( tar_tag, reb_reg );
         }
 
         orig_text = orig_text.replace(/(<font.*?>|<\/font>)/gi, '');
@@ -530,12 +545,21 @@
         // startpointもしくはbreakより前の文章は色を変える(テスト機能)
         orig_text = orig_text.replace(/(^.*@startpoint)/, '<font color=\"#aaaaaa\">$1</font>');
         orig_text = orig_text.replace(/(^.*@break)/, '<font color=\"#aaaaaa\">$1</font>');
+
         // テキストカラータグを元に戻す
         if ( tagreplace == 2) {
-            orig_text = orig_text.replace(/__TXTC_S__ class="textcolor_(.*?)"__TXT_SE__(.*?)__TXTC_E__/gi, "&lt;f color$1&gt;$2&lt;/f&gt;");
+            orig_text = orig_text.replace(/__TXTC_S__ class="textcolor_(.*?)"__TXTC_SE__(.*?)__TXTC_E__/gi, "&lt;f color$1&gt;$2&lt;/f&gt;");
         } else {
-            orig_text = orig_text.replace(/__TXTC_S__(.*?)__TXT_SE__(.*?)__TXTC_E__/gi, "<font$1>$2</font>");
+            orig_text = orig_text.replace(/__TXTC_S__(.*?)__TXTC_SE__(.*?)__TXTC_E__/gi, "<font$1>$2</font>");
         }
+
+        // カラータグにおいて仕様想定外の表記方法で変換に失敗した場合、それらのタグを消去する。
+        for (i = 1; i < 4; i++) {
+            orig_text = orig_text.replace(" class=\"textcolor_"+i+"\"__TXTC_SE__", "" );
+        }
+        orig_text = orig_text.replace( "__TXTC_S__", "" );
+        orig_text = orig_text.replace( "__TXTC_SE__", "" );
+        orig_text = orig_text.replace( "__TXTC_E__", "" );
 
         for (let i = orig_text.length - 1; i >= 0; i--) {
             if (orig_text[i] === '>') {

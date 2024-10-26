@@ -20,6 +20,7 @@
                     AI出力の色表示を残す設定にしているのに、その色が消えてしまう不具合を修正。
                     GUIv3がAIのべりすとサイト上の設定からも消えているので、関連コードを削除。
                     サイドメニュー表示の時の禁止ワード除外リスト・適用中の禁止ワードとバイアスの表の幅がメニューの幅を超過していた不具合を修正。
+                    シャーディング(本文の分割)境界の調整機能を全面的に書き換え。ひとかたまりのAI出力の途中に境界が来ても、できるだけ色分けが失われないようにした。
 2024/06/17  0.23.5  GUIv2：使用可能文字の判定処理にモデルがnext-previewの場合を追加。
 2024/05/19  0.23.4  GUIv2：スーパーとりんさまのバリエーション（カラフル・ソリッド）で使用可能文字の判定などが通常とりんさま相当になってしまう不具合を修正。
 2023/11/29  0.23.3  GUIv2：サイドメニューが有効なときは、履歴が横から出てくるボタンを表示しないようにした。
@@ -614,78 +615,141 @@
 
         var last_shard_ends_with_br = false;
 
-        while (orig_text.length >= 1) {
-            const tmp_max_cur = orig_text.substring(0, sharding_max)
-            let divide_text_by1 = tmp_max_cur.lastIndexOf("<br>");
-            let divide_text_by2 = tmp_max_cur.lastIndexOf("</font>");
-            let divide_text_by = divide_text_by1 > divide_text_by2 ? divide_text_by1 : (divide_text_by2 + "</font>".length)
-            if (orig_text.length <= divide_text_by * 1.1) {
-                // 境界が本文末近くにあるときは、シャーディングの分割を手前の方において、本文末近くでは分割されないようにする
-                const tmp_half_cur = orig_text.substring(0, Math.floor(orig_text.length * 2 / 3))
-                divide_text_by1 = tmp_half_cur.lastIndexOf("<br>");
-                divide_text_by2 = tmp_half_cur.lastIndexOf("</font>");
-                divide_text_by = divide_text_by1 > divide_text_by2 ? divide_text_by1 : (divide_text_by2 + "</font>".length);
-            }
-            if (divide_text_by <= sharding_max / 2) { divide_text_by = sharding_max; }
-            let temp_cur = orig_text.substring(0, divide_text_by);
+        if (orig_text.length >= 1) {
+            const data_container = document.getElementById('data_container')
+            const data_edit = document.createElement('div')
+            data_edit.contentEditable = 'true'
+            data_edit.spellcheck = false
+            data_edit.autocapitalize = 'off'
+            data_edit.id = 'data_edit'
+            data_edit.className = 'data_edit'
+            data_edit.setAttribute('autocorrect', 'off')
+            data_edit.style.fontFamily = font_family
+            data_edit.style.fontSize = (document.getElementById('vis_fontsize').value / 40) + 'rem'
+            data_edit.style.letterSpacing = (document.getElementById('vis_fontkerning').value / 80) + 'rem'
+            data_edit.style.lineHeight = (document.getElementById('vis_fontleading').value / 10) + 'rem'
+            data_edit.style.color = document.getElementById('vis_fontcolor').value
+            data_edit.onclick = () => { window.CopyContent(); window.savecurrentwork(); }
+            data_edit.onmouseout = () => { window.CopyContent(); window.savecurrentwork(); }
+            data_edit.onpaste = (event) => { window.handle_paste(this, event); return false; }
 
-            // fontタグが入れ子になっていないかのチェック
-            let font_start = temp_cur.lastIndexOf('<font'), font_end = temp_cur.lastIndexOf('</font>')
-            if (font_start > 0 && font_end > font_start) {
-                let font_outside_start = temp_cur.lastIndexOf('<font', font_start - 1),
-                    font_outside_end = temp_cur.lastIndexOf('</font>', font_start - 1),
-                    font_inside = temp_cur.indexOf('</font>', font_start)
-                if (font_inside === font_end && font_outside_start >= 0 && font_outside_end < 0) {
-                    font_start = font_outside_start
-                    font_end = -1
+            data_edit.innerHTML = orig_text
+
+            /**
+             * 指定ノードの最後が改行かチェックする。子孫ノードの末尾が改行でも可。
+             * @param {Node} node 
+             * @returns {boolean}
+             */
+            const checkLastBr = (node) => {
+                if (node.hasChildNodes()) {
+                    return checkLastBr(node.lastChild)
                 }
+                if (node.nodeType === Node.ELEMENT_NODE && node instanceof Element && node.tagName === 'BR') {
+                    return true
+                }
+                return false
             }
-            let span_start = temp_cur.lastIndexOf('<span'), span_end = temp_cur.lastIndexOf('</span>')
-            if (font_start >= 0 && (font_end < 0 || (font_end >= 0 && font_start > font_end))) {
-                // fontタグが分断されている
-                font_end = orig_text.indexOf('</font>', divide_text_by) + '</font>'.length
-                const font_endpoint = temp_cur.lastIndexOf('<font color="#aaaaaa">@endpoint')
-                divide_text_by = -1
-                if (font_end >= sharding_max * 1.2 || font_endpoint === font_start) {
-                    // 規定のサイズより大きめであればfontタグの前に分割点を置く
-                    divide_text_by = temp_cur.lastIndexOf('<br>', font_start);
-                }
-                if (divide_text_by <= 0) {
-                    // fontタグの後ろの分割点を決める。spanタグがあれば、その前に置く
-                    divide_text_by = orig_text.indexOf('<br>', font_end);
-                    const posSpan = orig_text.indexOf('<span', font_end);
-                    if (posSpan >= 0 && posSpan < divide_text_by) {
-                        divide_text_by = posSpan
-                    } else if (divide_text_by < 0) {
-                        // 分割点に改行がなければ改行を挿入する
-                        if (orig_text.slice(-4) !== '<br>') {
-                            orig_text = orig_text + '<br>'
+            while (data_edit.textContent.length > sharding_max) {
+                // まず次のdivを作って、そのdivの文字数が規定値になるまで後ろから順番にノードを移動する
+                const next_data_edit = data_edit.cloneNode()
+                // cloneNodeでイベントはコピーされない
+                next_data_edit.onclick = data_edit.onclick
+                next_data_edit.onmouseout = data_edit.onmouseout
+                next_data_edit.onpaste = data_edit.onpaste
+
+                // あとで削るので、limitはちょっと超えても良いことにする
+                let lastNode = null, limit = sharding_max * 1.1
+                while (limit > 0 && data_edit.lastChild) {
+                    const last_length = data_edit.lastChild.textContent.length;
+                    if (limit - last_length < 0) {
+                        // 次のノードを追加して規定値を超えるなら、追加せずに抜ける
+                        // ただし、次のノードが大きい場合で、既に追加したノードの量が少ない、または全く無い場合は、追加する
+                        if ( ! ((last_length < sharding_max && limit > sharding_max * 3 / 4)
+                            || (last_length >= sharding_max && limit === sharding_max * 1.1))) {
+                            break;
                         }
-                        divide_text_by = orig_text.length
                     }
+                    
+                    lastNode = next_data_edit.insertBefore(data_edit.lastChild, lastNode)
+                    limit -= last_length
                 }
-                temp_cur = orig_text.substring(0, divide_text_by);
-            } else if (span_start >= 0 && (span_end < 0 || (span_end >= 0 && span_start > span_end))) {
-                // spanタグが分断されている
-                span_end = orig_text.indexOf('</span>', divide_text_by) + '</span>'.length
-                divide_text_by = orig_text.indexOf('<br>', span_end);
-                if (divide_text_by < 0) {
-                    divide_text_by = orig_text.length
+
+                
+                // 規定値になったら、先頭のノードを改行に相当するところまで切り取って、改行の手前までを元のdivに戻す
+                if (data_edit.lastChild === null || checkLastBr(data_edit.lastChild)) {
+                    // 前のdivの最後が改行だったら何もしない
+                    data_container.insertBefore(next_data_edit, data_container.firstChild)
+                    continue
                 }
-                temp_cur = orig_text.substring(0, divide_text_by);
+                while (next_data_edit.hasChildNodes()) {
+                    const target = next_data_edit.firstChild
+                    if (target.nodeType === Node.ELEMENT_NODE && target instanceof Element) {
+                        if (target.tagName === 'BR') {
+                            // 改行は前のに戻して、範囲確定
+                            data_edit.append(target)
+                            // 連続する改行は全部前のに戻す
+                            let target_br = next_data_edit.firstChild
+                            while (target_br.nodeType === Node.ELEMENT_NODE && target_br instanceof Element && target_br.tagName === 'BR') {
+                                data_edit.append(target_br)
+                                target_br = next_data_edit.firstChild
+                            }
+                            break
+                        } else if (target.tagName === 'FONT') {
+                            // if (target.getAttribute('color') === '#aaaaaa') {
+                            //     // コメントブロックである。つまりこの前後には改行があるものとして扱えるはず
+                            //     // コメントブロックは分割しないので、ループ離脱
+                            //     break
+                            // } else {
+
+                            // AI出力その他装飾である
+                            // 中の改行を探す
+                            const br_list = target.querySelectorAll('br')
+                            if (br_list.length === 0) {
+                                // 改行が見つからなかったので前のに戻す
+                                data_edit.append(target)
+                                continue
+                            }
+                            for (const br of br_list) {
+                                if (br.parentNode !== target) {
+                                    // fontタグが入れ子になっていてややこしいので、このbrは使わない
+                                    continue
+                                }
+
+                                if (target.lastChild === br) {
+                                    // fontタグの最後が改行なので、全体を前のに戻す
+                                    data_edit.append(target)
+                                    break
+                                }
+                                // fontタグをbrの前後に分ける
+                                const clone = target.cloneNode()
+                                while (target.firstChild !== br && target.hasChildNodes()) {
+                                    clone.appendChild(target.firstChild)
+                                }
+                                // 改行はfontの外に出しておかないと、シャーディングの枠にフォーカスしたとき、末尾に改行が追加されてしまう
+                                data_edit.append(clone, br)
+
+                                break
+                            }
+                            // ここまで来たら少なくもとどこかの改行で分割しているはずなので抜ける
+                            break
+
+                            // }
+                        }
+                    }
+
+                    // テキストノードや未知のタグなので前のに戻して、次のノードへ
+                    data_edit.append(target)
+                }
+
+                data_container.insertBefore(next_data_edit, data_container.firstChild)
             }
 
-            if (temp_cur.substring(0, 4) == "<br>" && last_shard_ends_with_br == false) { temp_cur = temp_cur.substring(4); }
-            if (temp_cur.trim().length <= 0) { break; }
-
-            const id_temp = 'data_edit';
-            $("<div contenteditable spellcheck=\"false\" autocorrect=\"off\" autocapitalize=\"off\" id=\"" + id_temp + "\" class=\"data_edit\" style=\"font-family: " + font_family + "; font-size:" + document.getElementById("vis_fontsize").value / 40 + "rem; letter-spacing:" + document.getElementById("vis_fontkerning").value / 80 + "rem; line-height:" + document.getElementById("vis_fontleading").value / 10 + "rem; color:" + document.getElementById("vis_fontcolor").value + ";\" onclick=\"CopyContent(); savecurrentwork();\" onmouseout=\"CopyContent(); savecurrentwork();\" onpaste=\"handle_paste(this, event); return false;\">" + temp_cur + "</div>").appendTo('#data_container');
-
-            orig_text = orig_text.substring(divide_text_by);
-            if (temp_cur.substring(temp_cur.length - 4) == "<br>" || temp_cur.substring(temp_cur.length - 11) == "<br></font>") { last_shard_ends_with_br = true; }
-            else { last_shard_ends_with_br = false; }
-
-            i++;
+            if (data_edit.hasChildNodes()) {
+                data_container.insertBefore(data_edit, data_container.firstChild)
+            } else {
+                // ノードがないので消す
+                data_edit.remove()
+            }
         }
 
         // イメージの挿入

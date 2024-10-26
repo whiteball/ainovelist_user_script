@@ -714,6 +714,26 @@
         }
     }
 
+    // textcolor_ai使用時に、最新出力結果への操作が正しく行われるために、先に結果テキストをキャッシュする
+    const resultHistory = ['']
+    const originalAIOutput_Writelog = window.AIOutput_Writelog
+    window.AIOutput_Writelog = function (text) {
+        resultHistory.push(text)
+        return originalAIOutput_Writelog(text)
+    }
+    window.GetResultHistory = function (index, with_tag = true) {
+        if (!resultHistory) {
+            return false
+        }
+        if (-resultHistory.length <= index && index < 0) {
+            index = resultHistory.length + index + 1
+        }
+        if (index < 1 || resultHistory.length < index) {
+            return ''
+        }
+        return with_tag ? '<span id="ai_output">' + resultHistory[index - 1] + '</span>' : resultHistory[index - 1]
+    }
+
     // @endpointの前に出力を挿入する機能
     // @endpointの直前に改行がないと動きません
     // PushHistoryが基本的に最新出力文挿入後にしか呼ばれないため、無理矢理割り込んでいます
@@ -858,11 +878,9 @@
         // 挿入テキストの作成
         var temp = "";
         for (var i = 1; i <= pref.undo_history_limit; i++) {
-            var history = window.GetHistory(i + 1);
+            var history = window.GetResultHistory(i + 1);
             if (history) {
-                const posOutput = history.indexOf('<span id="ai_output"'),
-                    substring = history.substring(posOutput, history.indexOf('</span>', posOutput) + '</span>'.length)
-                temp += '(' + i + ')<br>' + substring + '<br>';
+                temp += '(' + i + ')<br>' + history + '<br>';
             } else {
                 break;
             }
@@ -923,11 +941,9 @@
         // 挿入テキストの作成
         let temp = ''
         for (var i = 1; i <= pref.undo_history_limit; i++) {
-            var history = window.GetHistory(i + 1);
+            var history = window.GetResultHistory(i + 1);
             if (history) {
-                const posOutput = history.indexOf('<span id="ai_output"'),
-                    substring = history.substring(posOutput, history.indexOf('</span>', posOutput) + '</span>'.length)
-                temp += '(' + i + ')\n' + substring.replace(/<br>/g, '\n').replace(/<\/?span[^>]*>/g, '') + '\n'
+                temp += '(' + i + ')\n' + history.replace(/<br>/g, '\n').replace(/<\/?span[^>]*>/g, '') + '\n'
             } else {
                 break
             }
@@ -1068,6 +1084,7 @@
             // 挿入テキストの作成
             buildHistorySelect(createHistoryText())
         }
+        resultHistory.splice(0, Infinity, '')
         originalCleanUpUndo()
     }
     const originalShowPost = window.showpost

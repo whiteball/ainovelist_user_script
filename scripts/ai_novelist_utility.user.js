@@ -150,6 +150,17 @@
         return (model_info.indexOf('やみおとめ') >= 0) || (model_info.indexOf('スーパーとりん') >= 0) || (model_info.indexOf('next-preview') >= 0)
     }
 
+    const OUTPUT_TYPE_AI_OUTPUT = 0, OUTPUT_TYPE_TEXTCOLOR_AI = 1
+    const getOutputType = function () {
+        const cur_gui = window.currentGuiMode()
+        const conversion_mode = window.currentTextConversionMode()
+        if( cur_gui != "chat" && (conversion_mode == "decoration1" || conversion_mode == "decoration2") ) {
+            return OUTPUT_TYPE_TEXTCOLOR_AI
+        } else {
+            return OUTPUT_TYPE_AI_OUTPUT
+        }
+    }
+
     // 「Ctrl+/」で選択範囲の行の上下に「@/*」と「@*/」を追加/削除する機能 & 「Alt+数字」で選択した単語を検索する機能
     document.getElementById('data_container').addEventListener('keyup', function (event) {
         if (event.isComposing || event.keyCode === 229) {
@@ -310,10 +321,17 @@
         const result = endpointSearch()
         if (result !== false) {
             const [all, endpoint, target] = result
-            let ai_output
             const top = window.scrollY, left = window.scrollX
-            if (target_element && (ai_output = document.getElementById(target_element))) {
-                ai_output.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' })
+            if (target_element) {
+                let ai_output
+                if (target_element.substr(0, 1) === '.') {
+                    ai_output = document.querySelector(target_element + ':last-of-type')
+                } else {
+                    ai_output = document.getElementById(target_element)
+                }
+                if (ai_output) {
+                    ai_output.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' })
+                }
             } else {
                 let endpoint_target = undefined
                 for (const font_tag of all[target].querySelectorAll('font[color="#aaaaaa"]')) {
@@ -756,7 +774,11 @@
         applyInsertImage()
 
         // 通常のスクロールをendpointがあればその前になるようにする
-        endpointScroll('ai_output')
+        if (getOutputType() === OUTPUT_TYPE_TEXTCOLOR_AI) {
+            endpointScroll('.textcolor_ai')
+        } else {
+            endpointScroll('ai_output')
+        }
         if (!nospan) {
             // 出力挿入時やUndo、Redoなどのスクロールを止める
             disableScrollTop()

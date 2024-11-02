@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AIのべりすとユーティリティ
 // @namespace    https://ai-novelist-share.geo.jp/
-// @version      0.24.0
+// @version      0.24.1
 // @description  「Ctrl+/」で選択範囲の行の上下に「@/*」と「@*/」を追加/削除する機能と、リトライ・Undo・Redoする前に確認ダイアログを出す機能と、本文入力欄の分割を複数文コメントや最新の出力文(色の変わっている部分)の途中になるのを避ける機能と、@endpointの前に出力するときは@endpointの位置にスクロールする機能と、Redoを3回押した時にもUndo履歴を挿入する機能と、サーバーに送信するテキストを確認する機能と、最大20回分まで過去の出力テキストの履歴を確認する機能と、トークンとして読み取れない文字をハイライトする機能と、特定の文字を含むトークンを検索できる機能と、選択テキストを任意のサイトで検索する機能と、本文に画像を挿入する機能と、編集ページを開いてからの出力数カウント表示などを追加します。※Chrome/Firefoxで動作確認
 // @author       しらたま
 // @match        https://ai-novel.com/novel.php
@@ -18,6 +18,7 @@
 /*
 更新履歴
 
+2024/11/02  0.24.1  このスクリプトで追加したメニュー切り替え丸ボタンの色が、カラースキーマ設定に従っていなかったのを修正。
                     AI出力色を残す設定の場合のタイムスタンプをUNIX時間から、人間でも読みやすいYYYY/MM/DD HH:ii:ss形式に変更。
                     AI出力部分にマウスカーソルを乗せたときに、保存しているタイムスタンプがあればツールチップとして表示する設定を追加。
                     AI出力色を残す設定の場合にUndo履歴でも色分けして表示する設定を追加。
@@ -1680,12 +1681,21 @@
             }
             const originalToggleOptions = window.ToggleOptions
             window.ToggleOptions = function (id, dontclose = false) {
+                var colsh = Colorscheme_Load( document.getElementById("vis_bgcolor").value );
+                if( !colsh ){
+                    colsh.body        = "#fff";
+                    colsh.balloon_off = "#eee";
+                    colsh.balloon_on  = "#444";
+                    colsh.option      = "#eee";
+                    colsh.text        = "#000";
+                    colsh.frame       = "#cd2b5a";
+                }
                 document.getElementById('options_usermod_text').style.display = "none";
                 document.getElementById('options_usermod_history').style.display = "none";
                 document.getElementById('options_usermod_info').style.display = "none";
-                document.getElementById('balloon_options_usermod_text').style.backgroundColor = "white";
-                document.getElementById('balloon_options_usermod_history').style.backgroundColor = "white";
-                document.getElementById('balloon_options_usermod_info').style.backgroundColor = "white";
+                document.getElementById('balloon_options_usermod_text').style.backgroundColor = colsh.balloon_off;
+                document.getElementById('balloon_options_usermod_history').style.backgroundColor = colsh.balloon_off;
+                document.getElementById('balloon_options_usermod_info').style.backgroundColor = colsh.balloon_off;
                 document.getElementById('img_options_usermod_text').src = text_icon_url;
                 document.getElementById('img_options_usermod_history').src = history_icon_url;
                 document.getElementById('img_options_usermod_info').src = info_icon_url;
@@ -1693,15 +1703,15 @@
                 if (document.getElementById('modelinfo').style.display !== '') {
                     if (Number(id) === 101) {
                         document.getElementById('options_usermod_text').style.display = "";
-                        document.getElementById('balloon_options_usermod_text').style.backgroundColor = "#444444";
+                        document.getElementById('balloon_options_usermod_text').style.backgroundColor = colsh.balloon_on;
                         document.getElementById('img_options_usermod_text').src = text_icon_white_url;
                     } else if (Number(id) === 102) {
                         document.getElementById('options_usermod_history').style.display = "";
-                        document.getElementById('balloon_options_usermod_history').style.backgroundColor = "#444444";
+                        document.getElementById('balloon_options_usermod_history').style.backgroundColor = colsh.balloon_on;
                         document.getElementById('img_options_usermod_history').src = history_icon_white_url;
                     } else if (Number(id) === 103) {
                         document.getElementById('options_usermod_info').style.display = "";
-                        document.getElementById('balloon_options_usermod_info').style.backgroundColor = "#444444";
+                        document.getElementById('balloon_options_usermod_info').style.backgroundColor = colsh.balloon_on;
                         document.getElementById('img_options_usermod_info').src = info_icon_white_url;
                     }
                 }

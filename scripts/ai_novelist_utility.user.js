@@ -20,6 +20,7 @@
 
                     AI出力色を残す設定の場合のタイムスタンプをUNIX時間から、人間でも読みやすいYYYY/MM/DD HH:ii:ss形式に変更。
                     AI出力部分にマウスカーソルを乗せたときに、保存しているタイムスタンプがあればツールチップとして表示する設定を追加。
+                    AI出力色を残す設定の場合にUndo履歴でも色分けして表示する設定を追加。
 2024/10/25  0.24.0  @startpoint @breakの色分けが適用されるようにした。
                     AI出力の色表示を残す設定にしているのに、その色が消えてしまう不具合を修正。
                     GUIv3がAIのべりすとサイト上の設定からも消えているので、関連コードを削除。
@@ -1129,7 +1130,12 @@
         for (var i = 1; i <= pref.undo_history_limit; i++) {
             var history = GetResultHistory(i + 1, false);
             if (history) {
-                temp += '(' + i + ')<br>' + history + '<br>';
+                if (pref.textcolor_ai_history && getOutputType() === OUTPUT_TYPE_TEXTCOLOR_AI) {
+                    const timestamp = GetResultHistory(i + 1, false, true)
+                    temp += '(' + i + ')<br><font class="textcolor_ai' + (timestamp ? ('" data-timestamp="' + timestamp) : '') + '">' + history + '</font><br>';
+                } else {
+                    temp += '(' + i + ')<br>' + history + '<br>';
+                }
             } else {
                 break;
             }
@@ -1190,7 +1196,7 @@
         // 挿入テキストの作成
         let temp = ''
         for (var i = 1; i <= pref.undo_history_limit; i++) {
-            var history = window.GetResultHistory(i + 1);
+            var history = GetResultHistory(i + 1, false);
             if (history) {
                 temp += '(' + i + ')\n' + history.replace(/<br>/g, '\n').replace(/<\/?span[^>]*>/g, '') + '\n'
             } else {
@@ -1694,6 +1700,7 @@
 <label><input type="checkbox" style="font-size: 18px; transform:scale(1.5);" id="mod_icon_scroll" name="mod_icon_scroll" onclick="CopyContent();" ` + (pref.icon_scroll ? 'checked' : '') + `><span class="explanations">　アイコンのスクロールを有効化</span></label><br>
 <label><input type="checkbox" style="font-size: 18px; transform:scale(1.5);margin-top:1rem" id="mod_force_insert_last" name="mod_force_insert_last" onclick="CopyContent();" ` + (pref.force_insert_last ? 'checked' : '') + `><span class="explanations">　endpoint存在時でも一番下に出力</span></label><br>
 <label><input type="checkbox" style="font-size: 18px; transform:scale(1.5);margin-top:1rem" id="mod_textcolor_ai_tooltip" name="mod_textcolor_ai_tooltip" onclick="CopyContent();" ` + (pref.textcolor_ai_tooltip ? 'checked' : '') + `><span class="explanations">　AI出力色を残す設定での出力部分にマウスカーソルを乗せると、出力日時をヒント表示</span></label><br>
+<label><input type="checkbox" style="font-size: 18px; transform:scale(1.5);margin-top:1rem" id="mod_textcolor_ai_history" name="mod_textcolor_ai_history" onclick="CopyContent();" ` + (pref.textcolor_ai_history ? 'checked' : '') + `><span class="explanations">　AI出力色を残す設定の場合、Undo履歴も色分け</span></label><br>
 <label><input type="number" style="font-size: 18px;margin-top:1rem;width: 5rem;" id="mod_undo_history_limit" name="mod_undo_history_limit" onclick="CopyContent();" value="` + pref.undo_history_limit + `" min="10" max="99999"><span class="explanations">　出力履歴の1ページ当たりの上限</span></label><br>
 <h4>検索ショートカット設定
 <span id="tooltips">
@@ -1806,6 +1813,18 @@
             savePref()
         })
         mod_textcolor_ai_tooltip.dispatchEvent(new Event('change'))
+    }
+    const mod_textcolor_ai_history = document.getElementById('mod_textcolor_ai_history')
+    if (mod_textcolor_ai_history) {
+        mod_textcolor_ai_history.addEventListener('change', function () {
+            loadPref()
+            if (this.checked) {
+                pref.textcolor_ai_history = true
+            } else {
+                pref.textcolor_ai_history = false
+            }
+            savePref()
+        })
     }
     const mod_undo_history_limit = document.getElementById('mod_undo_history_limit')
     if (mod_undo_history_limit) {

@@ -18,6 +18,8 @@
 /*
 更新履歴
 
+                    AI出力色を残す設定の場合のタイムスタンプをUNIX時間から、人間でも読みやすいYYYY/MM/DD HH:ii:ss形式に変更。
+                    AI出力部分にマウスカーソルを乗せたときに、保存しているタイムスタンプがあればツールチップとして表示する設定を追加。
 2024/10/25  0.24.0  @startpoint @breakの色分けが適用されるようにした。
                     AI出力の色表示を残す設定にしているのに、その色が消えてしまう不具合を修正。
                     GUIv3がAIのべりすとサイト上の設定からも消えているので、関連コードを削除。
@@ -830,14 +832,46 @@
         }
     }
 
+    // textcolor_aiに情報表示を追加
+    document.getElementsByTagName('head')[0].insertAdjacentHTML('beforeend', `<style type="text/css" id="mod-textcolor-ai-css-var">
+        .mod_textcolor_ai_timestamp {
+            --tooltip-offset: -1.2rem;
+        }
+    </style><style type="text/css" id="mod-textcolor-ai">
+        .mod_textcolor_ai_timestamp .textcolor_ai {
+            position: relative;
+        }
+        .mod_textcolor_ai_timestamp .textcolor_ai[data-timestamp]:hover::before {
+            pointer-events: none;
+            content: attr(data-timestamp);
+            position: absolute;
+            background-color: beige;
+            color: black;
+            border: 1px solid grey;
+            font-size: 75%;
+            line-height: 100%;
+            top: var(--tooltip-offset);
+            left: 0;
+            padding: 2px 2px;
+            text-wrap: nowrap;
+        }
+    </style>`)
+
     // textcolor_ai使用時に、最新出力結果への操作が正しく行われるために、先に結果テキストをキャッシュする
-    const resultHistory = ['']
+    const resultHistory = [['', '']]
     const originalAIOutput_Writelog = window.AIOutput_Writelog
     window.AIOutput_Writelog = function (text) {
-        resultHistory.push(text)
+        resultHistory.push([text, formatDate(new Date())])
         return originalAIOutput_Writelog(text)
     }
-    window.GetResultHistory = function (index, with_tag = true) {
+    /**
+     * 
+     * @param {number} index 
+     * @param {boolean} with_tag 
+     * @param {boolean} only_timestamp 
+     * @returns {string|number|false}
+     */
+    const GetResultHistory = function (index, with_tag = true, only_timestamp = false) {
         if (!resultHistory) {
             return false
         }
@@ -847,7 +881,24 @@
         if (index < 1 || resultHistory.length < index) {
             return ''
         }
-        return with_tag ? '<span id="ai_output">' + resultHistory[index - 1] + '</span>' : resultHistory[index - 1]
+        if (only_timestamp) {
+            return resultHistory[index - 1][1]
+        }
+        return with_tag ? '<span id="ai_output" data-timestamp="' + resultHistory[index - 1][1] + '">' + resultHistory[index - 1][0] + '</span>' : resultHistory[index - 1][0]
+    }
+    window.GetResultHistory = GetResultHistory
+
+    const originalDoneLoading = window.DoneLoading
+    window.DoneLoading = async function () {
+        // UNIX時間が入っていたらtoLocaleString()で変換
+        for (const element of document.getElementsByClassName('textcolor_ai')) {
+            const timestamp = element.getAttribute('data-timestamp')
+            if (timestamp && !isNaN(timestamp)) {
+                element.setAttribute('data-timestamp', formatDate(new Date(Number(timestamp))))
+            }
+        }
+        originalDoneLoading()
+    }
     }
 
     // @endpointの前に出力を挿入する機能
@@ -864,14 +915,14 @@
                 // 出力した後
                 end += '</font>'.length
                 let aiFixed
-                const last_result = window.GetResultHistory(-1, false)
+                const last_result = GetResultHistory(-1, false)
                 for (const ai of [...document.getElementById('data_container').getElementsByClassName('textcolor_ai')].reverse()) {
-                    if (ai.innerHTML === last_result) {
+                    if (ai.innerHTML === last_result && !ai.getAttribute('data-timestamp')) {
                         output = last_result
                         aiFixed = ai
                         // AI出力にタイムスタンプを付ける
                         // シャーディングの兼ね合いで分割することがあるので、分割しても元は一つだとわかりやすくするため
-                        ai.setAttribute('data-timestamp', Date.now())
+                        ai.setAttribute('data-timestamp', GetResultHistory(-1, false, true))
 
                         // if (ai.parentNode.tagName === 'DIV' && ai.parentNode.id.toLowerCase() === 'data_edit') {
                         if (ai.parentElement.tagName === 'FONT' && ai.parentElement.parentElement.id.toLowerCase() === 'data_edit') {
@@ -1076,7 +1127,7 @@
         // 挿入テキストの作成
         var temp = "";
         for (var i = 1; i <= pref.undo_history_limit; i++) {
-            var history = window.GetResultHistory(i + 1);
+            var history = GetResultHistory(i + 1, false);
             if (history) {
                 temp += '(' + i + ')<br>' + history + '<br>';
             } else {
@@ -1282,7 +1333,7 @@
             // 挿入テキストの作成
             buildHistorySelect(createHistoryText())
         }
-        resultHistory.splice(0, Infinity, '')
+        resultHistory.splice(0, Infinity, ['', ''])
         originalCleanUpUndo()
     }
     const originalShowPost = window.showpost
@@ -1527,7 +1578,8 @@
             const VisualChange2 = function () {
                 const $ = window.jQuery
                 $('#show-history-text,#show-history-text-side,#send-text-confirm,#send-ban-word-confirm,#send-bias-confirm,#mod_anti_ban_words').css('font-family', document.getElementById("vis_fontfamily").value);
-                $('#show-history-text,#show-history-text-side,#send-text-confirm,#send-ban-word-confirm,#send-bias-confirm,#mod_anti_ban_words').css('font-size', document.getElementById("vis_fontsize").value / 40 + 'rem');
+                const fontSize = document.getElementById("vis_fontsize")
+                $('#show-history-text,#show-history-text-side,#send-text-confirm,#send-ban-word-confirm,#send-bias-confirm,#mod_anti_ban_words').css('font-size', fontSize.value / 40 + 'rem');
                 $('#show-history-text,#show-history-text-side,#send-text-confirm,#mod_anti_ban_words').css('letter-spacing', document.getElementById("vis_fontkerning").value / 80 + 'rem');
                 $('#show-history-text,#show-history-text-side,#send-text-confirm,#mod_anti_ban_words').css('line-height', document.getElementById("vis_fontleading").value / 10 + 'rem');
                 const array_iconsize_actuals = new Array('32', '20', '24', '28', '32', '36', '40', '48');
@@ -1546,6 +1598,13 @@
                     $(this).css('height', array_iconsize_actuals[document.getElementById("gui_iconsize").value] * 2);
                     $(this).css('margin-right', array_iconsize_actuals[document.getElementById("gui_iconsize").value] / 7);
                 });
+
+                const mod_textcolor_ai_css_var = document.getElementById('mod-textcolor-ai-css-var')
+                if (mod_textcolor_ai_css_var) {
+                    mod_textcolor_ai_css_var.textContent = `.mod_textcolor_ai_timestamp {
+                        --tooltip-offset: -${ fontSize.value / 40 }rem;
+                    }`
+                }
             }
             document.getElementById('vis_fontsize').addEventListener('input', VisualChange2);
             document.getElementById('vis_fontkerning').addEventListener('input', VisualChange2);
@@ -1634,6 +1693,7 @@
 <h3>ユーザースクリプト</h3>
 <label><input type="checkbox" style="font-size: 18px; transform:scale(1.5);" id="mod_icon_scroll" name="mod_icon_scroll" onclick="CopyContent();" ` + (pref.icon_scroll ? 'checked' : '') + `><span class="explanations">　アイコンのスクロールを有効化</span></label><br>
 <label><input type="checkbox" style="font-size: 18px; transform:scale(1.5);margin-top:1rem" id="mod_force_insert_last" name="mod_force_insert_last" onclick="CopyContent();" ` + (pref.force_insert_last ? 'checked' : '') + `><span class="explanations">　endpoint存在時でも一番下に出力</span></label><br>
+<label><input type="checkbox" style="font-size: 18px; transform:scale(1.5);margin-top:1rem" id="mod_textcolor_ai_tooltip" name="mod_textcolor_ai_tooltip" onclick="CopyContent();" ` + (pref.textcolor_ai_tooltip ? 'checked' : '') + `><span class="explanations">　AI出力色を残す設定での出力部分にマウスカーソルを乗せると、出力日時をヒント表示</span></label><br>
 <label><input type="number" style="font-size: 18px;margin-top:1rem;width: 5rem;" id="mod_undo_history_limit" name="mod_undo_history_limit" onclick="CopyContent();" value="` + pref.undo_history_limit + `" min="10" max="99999"><span class="explanations">　出力履歴の1ページ当たりの上限</span></label><br>
 <h4>検索ショートカット設定
 <span id="tooltips">
@@ -1731,6 +1791,21 @@
             }
             savePref()
         })
+    }
+    const mod_textcolor_ai_tooltip = document.getElementById('mod_textcolor_ai_tooltip')
+    if (mod_textcolor_ai_tooltip) {
+        mod_textcolor_ai_tooltip.addEventListener('change', function () {
+            loadPref()
+            if (this.checked) {
+                document.getElementById('data_container').classList.add('mod_textcolor_ai_timestamp')
+                pref.textcolor_ai_tooltip = true
+            } else {
+                document.getElementById('data_container').classList.remove('mod_textcolor_ai_timestamp')
+                pref.textcolor_ai_tooltip = false
+            }
+            savePref()
+        })
+        mod_textcolor_ai_tooltip.dispatchEvent(new Event('change'))
     }
     const mod_undo_history_limit = document.getElementById('mod_undo_history_limit')
     if (mod_undo_history_limit) {

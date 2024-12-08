@@ -2,7 +2,7 @@
 // @name         AIのべりすと 本文をクリップボードにコピー／クリップボードで本文を上書き
 // @namespace    https://ai-novelist-share.geo.jp/
 // @version      0.1.1
-// @description  AIのべりすと編集ページにある環境設定(デスクスタンドのアイコン)の「インポート／エクスポート」の下に、「本文をクリップボードにコピー」ボタン(Chrome/Firefox)と「クリップボードで本文を完全に上書き」ボタン(Chromeのみ)を追加します。
+// @description  AIのべりすと編集ページにある環境設定(デスクスタンドのアイコン)の「インポート／エクスポート」の下に、「本文をクリップボードにコピー」ボタンと「クリップボードで本文を完全に上書き」ボタンを追加します。
 // @author       しらたま
 // @match        https://ai-novel.com/novel.php
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=ai-novel.com
@@ -14,6 +14,8 @@
 
 /*
 更新履歴
+                 「クリップボードで本文を完全に上書き」でクリップボードにhtmlしかなくてもペーストできるようにした。
+                 Firefoxでもクリップボードの取得ができるようになったので、記述を修正。
 2023/03/29 0.1.1 コメントを除外するとき、1つ目のコメント以外が消えていなかったのを修正。
 */
 (function() {
@@ -89,7 +91,29 @@
         document.querySelector('.data_edit').dispatchEvent(new Event('click'))
         let text = ''
         try {
-            text = await navigator.clipboard.readText()
+            // const permission = await navigator.permissions.query({
+            //     name: "clipboard-read",
+            // })
+            // if (permission.state === "denied") {
+            //     throw new Error("クリップボードへのアクセス権が取得できませんでした。")
+            // }
+
+            const content = await navigator.clipboard.read()
+            for (const item of content) {
+                if (item.types.includes("text/html")) {
+                    const blob = await item.getType("text/html");
+                    text = await blob.text()
+                    text = text.replace(/class="textcolor_ai" style="[^"]*"/gi, 'class="textcolor_ai"')
+                        .replace(/[\r\n]/gi, '')
+                        .replaceAll('<!--StartFragment-->', '')
+                        .replaceAll('<!--EndFragment-->', '')
+                } else if (item.types.includes("text/plain")) {
+                    const blob = await item.getType("text/plain");
+                    text = await blob.text()
+                } else {
+                    throw new Error("クリップボードに利用可能なテキストがありません。")
+                }
+            }
         } catch (e) {
             text = ''
             window.alert('クリップボードの取得でエラーが出ました。\n本文欄にカーソルを合わせてから、もう一度実行してみてください。\n(' + e.message + ')')

@@ -19,6 +19,7 @@
 更新履歴
 
                     AI出力部分の端に@／＊や@＊／がある場合は、それらがAI出力部分の外側に出るようにした。
+                    AI出力色を残す設定の場合に、出力履歴からコピペしても色分けを維持するようにした。ただし、その出力をしたときにAI出力色を残す設定になっていた場合に限る。
                     AI出力部分にマウスカーソルを乗せたときに、その部分に囲み線を表示する設定を追加。
 2024/11/02  0.24.1  このスクリプトで追加したメニュー切り替え丸ボタンの色が、カラースキーマ設定に従っていなかったのを修正。
                     AI出力色を残す設定の場合のタイムスタンプをUNIX時間から、人間でも読みやすいYYYY/MM/DD HH:ii:ss形式に変更。
@@ -835,7 +836,7 @@
     // セッション情報の読み書き
     const saveSession = function () {
         const history_hidden = document.getElementById('show-history-text-hidden')
-        const current_undo = createHistoryText()
+        const current_undo = createHistoryText(true)
         const history = (current_undo ? '<|entry|>' + current_undo : '') + (history_hidden ? history_hidden.value : '')
         sessionStorage['usermod_stat_' + localStorage.current_works_id] = JSON.stringify({ totalOutputChar, totalOutputCount, totalRetryCount, history })
     }
@@ -895,6 +896,9 @@
             left: 0;
             padding: 2px 2px;
             text-wrap: nowrap;
+        }
+        #show-history-text .textcolor_ai {
+            color: revert;
         }
     </style>`)
 
@@ -1288,13 +1292,18 @@
     }
 
     // 送信テキストをテキストエリアに流す/出力履歴をため込む - ここから
-    const createHistoryText = () => {
+    const createHistoryText = (with_tag = false) => {
         // 挿入テキストの作成
         let temp = ''
         for (var i = 1; i <= pref.undo_history_limit; i++) {
-            var history = GetResultHistory(i + 1, false);
+            const history = GetResultHistory(i + 1, false)
             if (history) {
-                temp += '(' + i + ')\n' + history.replace(/<br>/g, '\n').replace(/<\/?span[^>]*>/g, '') + '\n'
+                if (with_tag) {
+                    const timestamp = GetResultHistory(i + 1, false, true)
+                    temp += '(' + i + ')<br><font class="textcolor_ai" data-timestamp="' + timestamp + '">' + history.replace(/<\/?span[^>]*>/g, '') + '</font><br>'
+                } else {
+                    temp += '(' + i + ')\n' + history.replace(/<br>/g, '\n').replace(/<\/?span[^>]*>/g, '') + '\n'
+                }
             } else {
                 break
             }
@@ -1533,6 +1542,11 @@
 #show-history-side-button, #show-history-side-left-button, #show-history-side-right-button {
     margin: 0 0.5rem;
 }
+#show-history-text {
+    height: 600px;
+    border: double 2px gray;
+    padding: 5px;
+}
 </style>`)
             document.getElementById('options_goodies').insertAdjacentHTML('afterend', `<div id="options_usermod_text" style="display: none;"><dl id="acMenu">
 <dt><div class="header2" style="padding:0px;"><h3 style="padding-left:15px;">▼　送信テキスト確認(ユーザースクリプト)</h3></div></dt>
@@ -1544,7 +1558,7 @@
 <dt><div class="header2" style="padding:0px;"><h3 style="padding-left:15px;">▼　出力履歴確認(ユーザースクリプト)</h3></div></dt>
 <dd class="dd-margin" style="margin-top: 15px;` + style + `display: block;">
 <div style="max-width:90%; color:#777777;" class="explanations">過去20回分までAIが出力したテキストの履歴を確認できます。<br>確認可能なすべての履歴をファイルに保存することもできます。<br>ページを閉じると履歴は消えます。</div>
-` + select_history.outerHTML + `<button id="show-history-download" style="margin-left: 20px;margin-bottom: 10px;height: 2rem;width: 120px;">ファイルに保存</button><br><textarea id="show-history-text" rows="30" readOnly></textarea>
+` + select_history.outerHTML + `<button id="show-history-download" style="margin-left: 20px;margin-bottom: 10px;height: 2rem;width: 120px;">ファイルに保存</button><br><div id="show-history-text"></div>
 </dd></dl><textarea id="show-history-text-hidden" style="display:none;" rows="30" readOnly></textarea></div>
 <div id="options_usermod_info" style="display: none;"><dl id="acMenu">
 <dt><div class="header2" style="padding:0px;"><h3 style="padding-left:15px;">▼　情報表示(ユーザースクリプト)</h3></div></dt>
@@ -1567,19 +1581,23 @@
             const changeCurrentHistory = function (targetName, selected) {
                 const textarea_history_hidden = document.getElementById('show-history-text-hidden'),
                     textarea_history = document.getElementById(targetName)
+                let result = ''
                 if (selected === '0') {
-                    textarea_history.value = createHistoryText()
-                    return
-                }
-                if (textarea_history_hidden.value === '') {
-                    textarea_history.value = ''
-                    return
-                }
-                const history_history = textarea_history_hidden.value.split('<|entry|>')
-                if (history_history[selected]) {
-                    textarea_history.value = history_history[selected]
+                    result = createHistoryText()
+                } else if (textarea_history_hidden.value === '') {
+                    result = ''
                 } else {
-                    textarea_history.value = ''
+                    const history_history = textarea_history_hidden.value.split('<|entry|>')
+                    if (history_history[selected]) {
+                        result = history_history[selected]
+                    } else {
+                        result = ''
+                    }
+                }
+                if (textarea_history.tagName === 'DIV') {
+                    textarea_history.innerHTML = result
+                } else {
+                    textarea_history.value = result
                 }
             }
             document.getElementById('show-history-select').addEventListener('change', function () {

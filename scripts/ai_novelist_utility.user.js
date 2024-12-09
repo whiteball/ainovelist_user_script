@@ -171,6 +171,26 @@
         }
     }
 
+    let pref = JSON.parse(localStorage.user_script_pref ? localStorage.user_script_pref : '{}')
+    if ( ! pref.undo_history_limit) {
+        pref.undo_history_limit = 98
+    }
+    const loadPref = function () {
+        const pref_temp = JSON.parse(localStorage.user_script_pref ? localStorage.user_script_pref : '{}')
+        pref.bg_image_opacity = pref_temp.bg_image_opacity
+        pref.bg_image_repeat = pref_temp.bg_image_repeat
+        pref.bg_image_size = pref_temp.bg_image_size
+        pref.bg_pos = pref_temp.bg_pos
+    }
+    const savePref = function () {
+        if (pref) {
+            localStorage.user_script_pref = JSON.stringify(pref)
+        }
+    }
+    if (!pref.hasOwnProperty('search_url')) {
+        pref.search_url = Object.assign({}, defaultSearchSiteConfig)
+    }
+
     // 「Ctrl+/」で選択範囲の行の上下に「@/*」と「@*/」を追加/削除する機能 & 「Alt+数字」で選択した単語を検索する機能
     document.getElementById('data_container').addEventListener('keyup', function (event) {
         if (event.isComposing || event.keyCode === 229) {
@@ -796,6 +816,8 @@
         }
     }
 
+    // 最終保存日時の記録
+    let lastLocalSave = '', lastRemoteSave = ''
     // 情報表示の機能
     let totalOutputChar = 0, totalOutputCount = 0, totalRetryCount = 0, lastTextDateCount = 0
     // セッション情報の読み書き
@@ -1153,7 +1175,7 @@
             }
         }
 
-        resizeHistorySide()
+        window.resizeHistorySide && window.resizeHistorySide()
     }
 
     // Redoを押した数をカウントする
@@ -1586,7 +1608,7 @@
                     show_history_side_button.innerText = '＋'
                     show_history_side_button.previousElementSibling.style.display = 'none'
                 }
-                resizeHistorySide()
+                window.resizeHistorySide && window.resizeHistorySide()
             }
             show_history_side_button.addEventListener('click', function () {
                 setHistorySideDisplay()
@@ -1616,7 +1638,7 @@
                 data_container.style.width = width + '%'
                 const side = document.getElementById('show-history-side')
                 side.style.width = (100 - width) + '%'
-                resizeHistorySide()
+                window.resizeHistorySide && window.resizeHistorySide()
             }
             document.getElementById('show-history-side-left-button').addEventListener('click', function () {
                 changeHistorySideOffset(-5)
@@ -1723,10 +1745,10 @@
             }
             VisualChange2()
         })()
-    const resizeHistorySide = function () {
+    window.resizeHistorySide = function () {
         // サイドの履歴の高さを調整
         const show_history_text_side = document.getElementById('show-history-text-side')
-        if (show_history_text_side) {
+        if (show_history_text_side && show_history_text_side.style.display !== 'none') {
             const data_container = document.getElementById('data_container')
             const rect_base = data_container.getBoundingClientRect(),
                 rect_parent = show_history_text_side.parentElement.getBoundingClientRect(),
@@ -1736,25 +1758,6 @@
     }
     // 送信テキストをテキストエリアに流す/出力履歴をため込む - ここまで
 
-    let pref = JSON.parse(localStorage.user_script_pref ? localStorage.user_script_pref : '{}')
-    if ( ! pref.undo_history_limit) {
-        pref.undo_history_limit = 98
-    }
-    const loadPref = function () {
-        const pref_temp = JSON.parse(localStorage.user_script_pref ? localStorage.user_script_pref : '{}')
-        pref.bg_image_opacity = pref_temp.bg_image_opacity
-        pref.bg_image_repeat = pref_temp.bg_image_repeat
-        pref.bg_image_size = pref_temp.bg_image_size
-        pref.bg_pos = pref_temp.bg_pos
-    }
-    const savePref = function () {
-        if (pref) {
-            localStorage.user_script_pref = JSON.stringify(pref)
-        }
-    }
-    if (!pref.hasOwnProperty('search_url')) {
-        pref.search_url = Object.assign({}, defaultSearchSiteConfig)
-    }
     document.querySelector('#options_goodies > .prefencesMenu')
         .insertAdjacentHTML('afterend', `<dl>
     <dt id="mod_user_script_menu" style="cursor: pointer">
@@ -1976,7 +1979,6 @@
     }
 
     // 最終保存日時の記録
-    let lastLocalSave = '', lastRemoteSave = ''
     const originalStorageSetItem = Storage.prototype.setItem
     Storage.prototype.setItem = function (key, value) {
         const work_id = localStorage.getItem('current_works_id')

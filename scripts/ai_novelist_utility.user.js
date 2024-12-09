@@ -18,6 +18,7 @@
 /*
 更新履歴
 
+                    AI出力部分にマウスカーソルを乗せたときに、その部分に囲み線を表示する設定を追加。
 2024/11/02  0.24.1  このスクリプトで追加したメニュー切り替え丸ボタンの色が、カラースキーマ設定に従っていなかったのを修正。
                     AI出力色を残す設定の場合のタイムスタンプをUNIX時間から、人間でも読みやすいYYYY/MM/DD HH:ii:ss形式に変更。
                     AI出力部分にマウスカーソルを乗せたときに、保存しているタイムスタンプがあればツールチップとして表示する設定を追加。
@@ -861,10 +862,14 @@
     document.getElementsByTagName('head')[0].insertAdjacentHTML('beforeend', `<style type="text/css" id="mod-textcolor-ai-css-var">
         .mod_textcolor_ai_timestamp {
             --tooltip-offset: -1.2rem;
+            --outline: dotted 1px;
         }
     </style><style type="text/css" id="mod-textcolor-ai">
         .mod_textcolor_ai_timestamp .textcolor_ai {
             position: relative;
+        }
+        .mod_textcolor_ai_timestamp .textcolor_ai:hover {
+            outline: var(--outline);
         }
         .mod_textcolor_ai_timestamp .textcolor_ai[data-timestamp]:hover::before {
             pointer-events: none;
@@ -1689,6 +1694,7 @@
                 if (mod_textcolor_ai_css_var) {
                     mod_textcolor_ai_css_var.textContent = `.mod_textcolor_ai_timestamp {
                         --tooltip-offset: -${ fontSize.value / 40 }rem;
+                        --outline: ${ pref.textcolor_ai_outline ? 'dotted 1px' : 'none'};
                     }`
                 }
             }
@@ -1772,6 +1778,7 @@
 <label><input type="checkbox" style="font-size: 18px; transform:scale(1.5);margin-top:1rem" id="mod_textcolor_ai_tooltip" name="mod_textcolor_ai_tooltip" onclick="CopyContent();" ` + (pref.textcolor_ai_tooltip ? 'checked' : '') + `><span class="explanations">　AI出力色を残す設定での出力部分にマウスカーソルを乗せると、出力日時をヒント表示</span></label><br>
 <label><input type="checkbox" style="font-size: 18px; transform:scale(1.5);margin-top:1rem" id="mod_textcolor_ai_history" name="mod_textcolor_ai_history" onclick="CopyContent();" ` + (pref.textcolor_ai_history ? 'checked' : '') + `><span class="explanations">　AI出力色を残す設定の場合、Undo履歴も色分け</span></label><br>
 <label><input type="checkbox" style="font-size: 18px; transform:scale(1.5);margin-top:1rem" id="mod_textcolor_ai_paste" name="mod_textcolor_ai_paste" onclick="CopyContent();" ` + (pref.textcolor_ai_paste ? 'checked' : '') + `><span class="explanations">　AI出力色を残す設定の場合、出力部分をコピペしたときに色分けを維持</span></label><br>
+<label><input type="checkbox" style="font-size: 18px; transform:scale(1.5);margin-top:1rem" id="mod_textcolor_ai_outline" name="mod_textcolor_ai_outline" onclick="CopyContent();" ` + (pref.textcolor_ai_outline ? 'checked' : '') + `><span class="explanations">　AI出力色を残す設定の場合、色分け部分に囲み線を表示</span></label><br>
 <label><input type="number" style="font-size: 18px;margin-top:1rem;width: 5rem;" id="mod_undo_history_limit" name="mod_undo_history_limit" onclick="CopyContent();" value="` + pref.undo_history_limit + `" min="10" max="99999"><span class="explanations">　出力履歴の1ページ当たりの上限</span></label><br>
 <h4>検索ショートカット設定
 <span id="tooltips">
@@ -1907,6 +1914,20 @@
                 pref.textcolor_ai_paste = false
             }
             savePref()
+        })
+    }
+    const mod_textcolor_ai_outline = document.getElementById('mod_textcolor_ai_outline')
+    if (mod_textcolor_ai_outline) {
+        mod_textcolor_ai_outline.addEventListener('change', function () {
+            loadPref()
+            if (this.checked) {
+                pref.textcolor_ai_outline = true
+            } else {
+                pref.textcolor_ai_outline = false
+            }
+            savePref()
+            // 表示更新
+            document.getElementById('vis_fontsize').dispatchEvent(new Event('input'))
         })
     }
     const mod_undo_history_limit = document.getElementById('mod_undo_history_limit')

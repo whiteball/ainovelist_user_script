@@ -18,6 +18,7 @@
 /*
 更新履歴
 
+                    AI出力部分の端に@／＊や@＊／がある場合は、それらがAI出力部分の外側に出るようにした。
                     AI出力部分にマウスカーソルを乗せたときに、その部分に囲み線を表示する設定を追加。
 2024/11/02  0.24.1  このスクリプトで追加したメニュー切り替え丸ボタンの色が、カラースキーマ設定に従っていなかったのを修正。
                     AI出力色を残す設定の場合のタイムスタンプをUNIX時間から、人間でも読みやすいYYYY/MM/DD HH:ii:ss形式に変更。
@@ -584,7 +585,9 @@
             orig_text = RemoveDecorationText(orig_text);
         }
 
-        orig_text = orig_text.replace(/(@\/\*|＠／＊)(.*?)(?!(?:@\/\*|＠／＊))(.*?)(@\*\/|＠＊／)/g, '<font color=\"#aaaaaa\">$1$2$3$4</font>');
+        orig_text = orig_text.replace(/(__TXTC_S__.*?__TXTC_SE__)?(@\/\*|＠／＊)(?![^@＠]*(?:@\/\*|＠／＊))(.*?)(@\*\/|＠＊／)(__TXTC_E__)?/g, '<font color=\"#aaaaaa\">$2$1$3$5$4</font>');
+        // orig_text = orig_text.replace(/(@\/\*|＠／＊)/g, '<span class="temp_comment_start">$1</span>');
+        // orig_text = orig_text.replace(/(@\*\/|＠＊／)/g, '<span class="temp_comment_end">$1</span>');
         //orig_text = orig_text.replace(/(@\/\*)/gi, '<font color=\"#aaaaaa\">@/*');
         //orig_text = orig_text.replace(/(@\*\/)/gi, '@*</a>\/</font>');
         //orig_text = orig_text.replace(/(＠／＊)/gi, '<font color=\"#aaaaaa\">＠／＊');
@@ -684,6 +687,14 @@
             data_edit.onpaste = (event) => { window.handle_paste(this, event); return false; }
 
             data_edit.innerHTML = orig_text
+
+            // 複数行コメント @/* ～ @*/ をfontタグで囲う
+            // while (1) {
+            //     const comment_start = data_edit.querySelector('.temp_comment_start')
+            //     if (!comment_start) {
+            //         break
+            //     }
+            // }
 
             /**
              * 指定ノードの最後が改行かチェックする。子孫ノードの末尾が改行でも可。

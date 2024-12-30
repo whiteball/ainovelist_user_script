@@ -1446,7 +1446,7 @@
     window.CleanUpUndo = function () {
         if (document.getElementById("data_undo").value !== '') {
             // 挿入テキストの作成
-            buildHistorySelect(createHistoryText())
+            buildHistorySelect(createHistoryText(true))
         }
         resultHistory.splice(0, Infinity, ['', ''])
         originalCleanUpUndo()
@@ -1587,7 +1587,7 @@
                     textarea_history = document.getElementById(targetName)
                 let result = ''
                 if (selected === '0') {
-                    result = createHistoryText()
+                    result = createHistoryText(true)
                 } else if (textarea_history_hidden.value === '') {
                     result = ''
                 } else {

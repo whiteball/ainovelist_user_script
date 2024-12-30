@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AIのべりすとユーティリティ
 // @namespace    https://ai-novelist-share.geo.jp/
-// @version      0.24.2
+// @version      0.24.3
 // @description  「Ctrl+/」で選択範囲の行の上下に「@/*」と「@*/」を追加/削除する機能と、リトライ・Undo・Redoする前に確認ダイアログを出す機能と、本文入力欄の分割を複数文コメントや最新の出力文(色の変わっている部分)の途中になるのを避ける機能と、@endpointの前に出力するときは@endpointの位置にスクロールする機能と、Redoを3回押した時にもUndo履歴を挿入する機能と、サーバーに送信するテキストを確認する機能と、最大20回分まで過去の出力テキストの履歴を確認する機能と、トークンとして読み取れない文字をハイライトする機能と、特定の文字を含むトークンを検索できる機能と、選択テキストを任意のサイトで検索する機能と、本文に画像を挿入する機能と、編集ページを開いてからの出力数カウント表示などを追加します。※Chrome/Firefoxで動作確認
 // @author       しらたま
 // @match        https://ai-novel.com/novel.php
@@ -18,6 +18,7 @@
 /*
 更新履歴
 
+2024/12/30  0.24.3  出力履歴が正しく描画されいなかったし、コピペ時の色分け維持も機能していなかった不具合を修正。
 2024/12/08  0.24.2  本文にフォーカスがあたっているとき、Alt+Iを押すと空のfontタグを挿入する機能を追加。挿入箇所で色分けの範囲が途切れるため、AI出力部分を編集する際に人間が入力した部分にまで色分けが適用されてしまうことを抑制することが可能。なお、文末に挿入した場合は、キャレットが移動していないように見えても一度右矢印キーを押さないと、デフォルト色に戻らない。
                     AI出力部分の端に@／＊や@＊／がある場合は、それらがAI出力部分の外側に出るようにした。
                     AI出力色を残す設定の場合に、出力履歴からコピペしても色分けを維持するようにした。ただし、その出力をしたときにAI出力色を残す設定になっていた場合に限る。
@@ -1617,7 +1618,7 @@
                     return
                 }
                 const title = localStorage.textdata_title, separator = '\n---*---*---*---*---*---\n'
-                const temp = title + separator + createHistoryText() + textarea_history_hidden.value.replace(/<\|entry\|>/g, separator)
+                const temp = title + separator + createHistoryText() + textarea_history_hidden.value.replace(/<\|entry\|>/g, separator).replace(/<br>/g, '\n').replace(/<\/?[^>]+>/gi, '')
                 const blob = new Blob([temp], { type: 'text/plain' }),
                     a = document.createElement("a")
                 const now = new Date()

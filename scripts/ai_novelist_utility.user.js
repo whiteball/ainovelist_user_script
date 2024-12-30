@@ -1550,6 +1550,7 @@
     height: 600px;
     border: double 2px gray;
     padding: 5px;
+    overflow-y: scroll;
 }
 </style>`)
             document.getElementById('options_goodies').insertAdjacentHTML('afterend', `<div id="options_usermod_text" style="display: none;"><dl id="acMenu">
@@ -1599,7 +1600,7 @@
                     }
                 }
                 if (textarea_history.tagName === 'DIV') {
-                    textarea_history.innerHTML = result
+                    textarea_history.innerHTML = result.replaceAll(/(\n)/g, '<br>')
                 } else {
                     textarea_history.value = result
                 }

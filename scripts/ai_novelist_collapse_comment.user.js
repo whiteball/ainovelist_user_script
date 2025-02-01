@@ -64,6 +64,10 @@ span.mod_collapse_comments:has(+ font[style*="display"]) {
             originalTextSharding(orig_text, nospan, noscroll, tagreplace)
 
             for (const comment of document.querySelectorAll('#data_edit font[color="#aaaaaa"]')) {
+                if (comment?.previousElementSibling?.className === 'mod_collapse_comments') {
+                    continue;
+                }
+
                 let count = 0;
                 let text_list = [];
                 for (const child of comment.childNodes) {

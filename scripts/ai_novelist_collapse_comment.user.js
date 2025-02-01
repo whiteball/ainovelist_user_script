@@ -6,6 +6,9 @@
 // @author       しらたま
 // @match        https://ai-novel.com/novel.php
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=ai-novel.com
+// @updateURL    https://github.com/whiteball/ainovelist_user_script/raw/refs/heads/main/scripts/ai_novelist_collapse_comment.user.js
+// @downloadURL  https://github.com/whiteball/ainovelist_user_script/raw/refs/heads/main/scripts/ai_novelist_collapse_comment.user.js
+// @supportURL   https://github.com/whiteball/ainovelist_user_script
 // @grant        none
 // ==/UserScript==
 

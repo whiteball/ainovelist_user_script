@@ -65,6 +65,9 @@ span.mod_collapse_comments:has(+ font[style*="display"]) {
 
             for (const comment of document.querySelectorAll('#data_edit font[color="#aaaaaa"]')) {
                 if (comment?.previousElementSibling?.className === 'mod_collapse_comments') {
+                    if (comment instanceof HTMLElement) {
+                        comment.style.display = 'none';
+                    }
                     continue;
                 }
 

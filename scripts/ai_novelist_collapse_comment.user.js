@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AIのべりすと 複数行コメントを折りたたむ
 // @namespace    https://ai-novelist-share.geo.jp/
-// @version      0.1.0
+// @version      0.1.1
 // @description  複数行コメントを折りたたみます。コメント領域の中に3つ以上の改行がある場合に、そのコメントを非表示にして代わりにコメントを展開するボタンを配置します。
 // @author       しらたま
 // @match        https://ai-novel.com/novel.php
@@ -20,7 +20,7 @@ span.mod_collapse_comments {
     color: #000000;
     background-color: #aaaaaa;
     border-radius: 100vh;
-    border-color: #333333;
+    border: solid 1px #333333;
     display: block;
     text-align:center;
     width: 100%;

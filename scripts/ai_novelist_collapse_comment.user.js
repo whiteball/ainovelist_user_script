@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         AIのべりすと 複数行コメントを折りたたむ
 // @namespace    https://ai-novelist-share.geo.jp/
-// @version      0.1.1
-// @description  複数行コメントを折りたたみます。コメント領域の中に3つ以上の改行がある場合に、そのコメントを非表示にして代わりにコメントを展開するボタンを配置します。
+// @version      0.1.2
+// @description  複数行コメントを折りたたみます。コメント領域の中に3つ以上の改行がある場合に、そのコメントを非表示にして代わりにコメントを展開するボタンを配置します。※既知の問題：チャットGUIの時@endpointがあると、最初のAI出力が行われるまで、ユーザー入力内容が@endpointと同じ折りたたみ枠に入ってしまう。
 // @author       しらたま
 // @match        https://ai-novel.com/novel.php
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=ai-novel.com
@@ -33,16 +33,30 @@ span.mod_collapse_comments:hover {
 span.mod_collapse_comments::before {
     content: '※閉じる';
 }
-span.mod_collapse_comments:has(+ font[style*="display"])::before {
+span.mod_collapse_comments:not(.mod_collapse_comments_end):has(+ font[style*="display"])::before {
     content: attr(data-text);
 }
-span.mod_collapse_comments:has(+ font[style*="display"]) {
+span.mod_collapse_comments:not(.mod_collapse_comments_end):has(+ font[style*="display"]) {
     display: inline-block;
+}
+font[style*="display"] + span.mod_collapse_comments.mod_collapse_comments_end::before {
+    content: attr(data-text);
+}
+font[style*="display"] + span.mod_collapse_comments.mod_collapse_comments_end {
+    display: inline-block;
+}
+span.mod_collapse_comments_end + br {
+    display: none;
 }
 </style>`)
 
     window.modClickEventHandler = function (event) {
-        const next = event.target.nextElementSibling;
+        let next;
+        if (event.target.classList.contains('mod_collapse_comments_end')) {
+            next = event.target.previousElementSibling;
+        } else {
+            next = event.target.nextElementSibling;
+        }
         if (next instanceof HTMLElement) {
             if (next.style.display === '') {
                 next.style.display = 'none';
@@ -83,14 +97,28 @@ span.mod_collapse_comments:has(+ font[style*="display"]) {
                 if (count >= 3) {
                     if (comment instanceof HTMLElement) {
                         const span = document.createElement('span');
-                        span.setAttribute('data-text', '※展開:' + text_list.join(' ').replaceAll(/<[^>]+>/gi, '').substring(0, 32).replace(/[@＠][\/／][\*＊]/gi, '') + '(' + count +'行略)')
+                        span.setAttribute('data-text', '※展開:' + text_list
+                            .join(' ')
+                            .replaceAll(/<[^>]+>/gi, '')
+                            .substring(0, 32)
+                            .replace(/[@＠][\/／][\*＊]/gi, '')
+                            .replace(/[@＠][\*＊][\/／]/gi, '')
+                            .replace(/[@＠]endpoint/gi, '')
+                            .replace(/[@＠]break/gi, '')
+                            .replace(/[@＠]startpoint/gi, '')
+                            .replace(/[@＠][_＿]/gi, '') + '(' + count +'行略)')
                         span.className = 'mod_collapse_comments'
                         span.contentEditable = false;
                         // 属性テキストとしてイベントを設定しないと、data_editへのinnerHTML更新でイベントが消える
                         span.setAttribute('onclick', 'modClickEventHandler(event)');
                         //span.addEventListener('click', modClickEventHandler);
                         comment.style.display = 'none';
-                        comment.parentElement.insertBefore(span, comment);
+                        if (text_list[0].indexOf('@endpoint') !== -1 || text_list[0].indexOf('＠endpoint') !== -1 ) {
+                            span.classList.add('mod_collapse_comments_end')
+                            comment.parentElement.append(span);
+                        } else {
+                            comment.parentElement.insertBefore(span, comment);
+                        }
                     }
                 }
 

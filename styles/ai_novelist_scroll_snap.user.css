@@ -1,0 +1,30 @@
+/* ==UserStyle==
+@name           AIのべりすと 編集画面でスクロールスナップ
+@namespace      https://ai-novelist-share.geo.jp/
+@version        0.1.0
+@description    編集画面でスクロールを特定位置で止まりやすくする。位置は最上部・タイトル・編集枠・最下部の4つ。
+@author         しらたま
+@updateURL      https://github.com/whiteball/ainovelist_user_script/raw/refs/heads/main/styles/ai_novelist_scroll_snap.user.css
+@downloadURL    https://github.com/whiteball/ainovelist_user_script/raw/refs/heads/main/styles/ai_novelist_scroll_snap.user.css
+@supportURL     https://github.com/whiteball/ainovelist_user_script
+==/UserStyle== */
+
+@-moz-document url-prefix("https://ai-novel.com/novel.php") {
+    body {
+        overflow-y: hidden;
+    }
+
+    #mainbody {
+        height: 100vh;
+        overflow-y: auto;
+        scroll-snap-type: y proximity;
+    }
+
+    div.header.sub,
+    #data_container_title,
+    div:has(> #data_container),
+    #modelinfo_sidemenu {
+        scroll-snap-align: start;
+        scroll-snap-stop: normal;
+    }
+}

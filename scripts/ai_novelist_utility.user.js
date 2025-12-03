@@ -1,14 +1,14 @@
 // ==UserScript==
 // @name         AIのべりすとユーティリティ
 // @namespace    https://ai-novelist-share.geo.jp/
-// @version      0.24.4
+// @version      0.25.0
 // @description  「Ctrl+/」で選択範囲の行の上下に「@/*」と「@*/」を追加/削除する機能と、リトライ・Undo・Redoする前に確認ダイアログを出す機能と、本文入力欄の分割を複数文コメントや最新の出力文(色の変わっている部分)の途中になるのを避ける機能と、@endpointの前に出力するときは@endpointの位置にスクロールする機能と、Redoを3回押した時にもUndo履歴を挿入する機能と、サーバーに送信するテキストを確認する機能と、最大20回分まで過去の出力テキストの履歴を確認する機能と、トークンとして読み取れない文字をハイライトする機能と、特定の文字を含むトークンを検索できる機能と、選択テキストを任意のサイトで検索する機能と、本文に画像を挿入する機能と、編集ページを開いてからの出力数カウント表示などを追加します。※Chrome/Firefoxで動作確認
 // @author       しらたま
 // @match        https://ai-novel.com/novel.php
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=ai-novel.com
-// @updateURL    https://gist.github.com/whiteball/b2bf1b71e37a07c87bb3948ea6f0f0f8/raw/ai_novelist_utility.user.js
-// @downloadURL  https://gist.github.com/whiteball/b2bf1b71e37a07c87bb3948ea6f0f0f8/raw/ai_novelist_utility.user.js
-// @supportURL   https://gist.github.com/whiteball/b2bf1b71e37a07c87bb3948ea6f0f0f8
+// @updateURL    https://github.com/whiteball/ainovelist_user_script/raw/refs/heads/main/scripts/ai_novelist_utility.user.js
+// @downloadURL  https://github.com/whiteball/ainovelist_user_script/raw/refs/heads/main/scripts/ai_novelist_utility.user.js
+// @supportURL   https://github.com/whiteball/ainovelist_user_script
 // @require      https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js
 // @grant        none
 // @tag          ai-novelist
@@ -18,6 +18,11 @@
 /*
 更新履歴
 
+2025/12/03  0.25.0  チャットGUIでUndo/Redo前の確認ダイアログが出なかったのを修正。
+                    すぴこさま/でりだ-03では全文字が使用できるので、これらのモデルが選択されているときは使用不可文字のハイライトを停止した。
+                    使用不可文字のハイライトの装飾が、送信テキストにも残る不具合を修正。
+                    開発版GUIでthinkブロックがあるときに表示が崩れるのを修正。
+                    goo辞書サービス終了に伴い、デフォルトの検索ショートカットから削除。
 2025/02/01  0.24.4  すぴこさまモデルを選択したときにトークナイザの判定が正しく行われるようにした。
 2024/12/30  0.24.3  出力履歴が正しく描画されいなかったし、コピペ時の色分け維持も機能していなかった不具合を修正。
 2024/12/08  0.24.2  本文にフォーカスがあたっているとき、Alt+Iを押すと空のfontタグを挿入する機能を追加。挿入箇所で色分けの範囲が途切れるため、AI出力部分を編集する際に人間が入力した部分にまで色分けが適用されてしまうことを抑制することが可能。なお、文末に挿入した場合は、キャレットが移動していないように見えても一度右矢印キーを押さないと、デフォルト色に戻らない。
@@ -633,51 +638,51 @@
         // すぴこさま/でりだ-03は理論上全ての文字が扱えるのでハイライトはしない
         if ( ! isSpikoTokenizer())
         {
-        for (let i = orig_text.length - 1; i >= 0; i--) {
-            if (orig_text[i] === '>') {
-                // タグ部分をスキップ
-                // TODO:スキップするとタグが適用された文章にハイライトが挿入できないのでは？
-                const pos = orig_text.lastIndexOf('<', i)
-                if (pos > 0) {
-                    const tag_name = orig_text.substring(pos + 1, i)
-                    if (tag_name[0] === '/') {
-                        const pos2 = orig_text.lastIndexOf('<' + tag_name.substring(1), pos)
-                        if (pos2 > 0) {
-                            i = pos2
-                        }
-                    } else {
-                        i = pos
-                    }
-                }
-            } else {
-                // ハイライトを挿入
-                let j = i
-                for (; j >= 0; j--) {
-                    if (isV3Tokenizer()) {
-                        const codePoint = orig_text.codePointAt(j)
-                        if (codePoint >= 0xDC00 && codePoint <= 0xDFFF) {
-                            // サロゲートペアの後ろ
-                            if (char_list_20b[orig_text.substr(j - 1, 2)]) {
-                                if (j === i) {
-                                    j--
-                                    i = j
-                                }
-                                break
-                            } else {
-                                j--
+            for (let i = orig_text.length - 1; i >= 0; i--) {
+                if (orig_text[i] === '>') {
+                    // タグ部分をスキップ
+                    // TODO:スキップするとタグが適用された文章にハイライトが挿入できないのでは？
+                    const pos = orig_text.lastIndexOf('<', i)
+                    if (pos > 0) {
+                        const tag_name = orig_text.substring(pos + 1, i)
+                        if (tag_name[0] === '/') {
+                            const pos2 = orig_text.lastIndexOf('<' + tag_name.substring(1), pos)
+                            if (pos2 > 0) {
+                                i = pos2
                             }
-                        } else if (char_list_20b[orig_text[j]]) {
-                            break
-                        }
-                    } else {
-                        if (char_list[orig_text[j]]) {
-                            break
+                        } else {
+                            i = pos
                         }
                     }
-                }
-                if (i !== j) {
-                    orig_text = orig_text.substring(0, j + 1) + '<a style="border:1px solid;color:inherit">' + orig_text.substring(j + 1, i + 1) + '</a>' + orig_text.substring(i + 1)
-                    i = j
+                } else {
+                    // ハイライトを挿入
+                    let j = i
+                    for (; j >= 0; j--) {
+                        if (isV3Tokenizer()) {
+                            const codePoint = orig_text.codePointAt(j)
+                            if (codePoint >= 0xDC00 && codePoint <= 0xDFFF) {
+                                // サロゲートペアの後ろ
+                                if (char_list_20b[orig_text.substr(j - 1, 2)]) {
+                                    if (j === i) {
+                                        j--
+                                        i = j
+                                    }
+                                    break
+                                } else {
+                                    j--
+                                }
+                            } else if (char_list_20b[orig_text[j]]) {
+                                break
+                            }
+                        } else {
+                            if (char_list[orig_text[j]]) {
+                                break
+                            }
+                        }
+                    }
+                    if (i !== j) {
+                        orig_text = orig_text.substring(0, j + 1) + '<a style="border:1px solid;color:inherit">' + orig_text.substring(j + 1, i + 1) + '</a>' + orig_text.substring(i + 1)
+                        i = j
                     }
                 }
             }

@@ -560,6 +560,11 @@
         else { $('#data_container').css('min-height', ''); }
         let i = 0;
 
+	    // 折りたたみタグは置換ではなく削除する。
+        if (window.removeThinkFoldBlocks) {
+            orig_text = window.removeThinkFoldBlocks(orig_text, 0);
+        }
+
         if (nospan == true) {
             orig_text = orig_text.replace(/<span.*?>|<\/span>/gi, '');
         }

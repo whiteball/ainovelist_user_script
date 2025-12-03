@@ -165,6 +165,10 @@
         const model_info = document.getElementById('modelinfo').textContent
         return (model_info.indexOf('やみおとめ') >= 0) || (model_info.indexOf('スーパーとりん') >= 0) || (model_info.indexOf('next-preview') >= 0) || (model_info.indexOf('すぴこさま') >= 0)
     }
+    const isSpikoTokenizer = function () {
+        const model_info = document.getElementById('modelinfo').textContent
+        return (model_info.indexOf('すぴこさま') >= 0) || (model_info.indexOf('でりだ-0') >= 0)
+    }
 
     const OUTPUT_TYPE_AI_OUTPUT = 0, OUTPUT_TYPE_TEXTCOLOR_AI = 1
     const getOutputType = function () {
@@ -625,6 +629,9 @@
         orig_text = orig_text.replace( "__TXTC_SE__", "" );
         orig_text = orig_text.replace( "__TXTC_E__", "" );
 
+        // すぴこさま/でりだ-03は理論上全ての文字が扱えるのでハイライトはしない
+        if ( ! isSpikoTokenizer())
+        {
         for (let i = orig_text.length - 1; i >= 0; i--) {
             if (orig_text[i] === '>') {
                 // タグ部分をスキップ
@@ -670,6 +677,7 @@
                 if (i !== j) {
                     orig_text = orig_text.substring(0, j + 1) + '<a style="border:1px solid;color:inherit">' + orig_text.substring(j + 1, i + 1) + '</a>' + orig_text.substring(i + 1)
                     i = j
+                    }
                 }
             }
         }

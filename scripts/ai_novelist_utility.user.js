@@ -148,10 +148,6 @@
             // Weblio類語・シソーラス
             url: 'https://thesaurus.weblio.jp/content/{word}',
         },
-        '3': {
-            // goo辞書
-            url: 'https://dictionary.goo.ne.jp/srch/all/{word}/m0u/',
-        },
     }
 
     const formatDate = function (dateTime, no_delimiter = false) {

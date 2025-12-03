@@ -1215,6 +1215,15 @@
         window.resizeHistorySide && window.resizeHistorySide()
     }
 
+    const originalDecoratedText = window.DecoratedText
+    window.DecoratedText = function (textdata, txtc_replace = true, cc_flag = false) {
+        // ハイライトを削除
+        textdata = textdata.replace(/(<a.*?>)/gi, '');
+        textdata = textdata.replace(/(<\/a>)/gi, '');
+        
+        return originalDecoratedText(textdata, txtc_replace, cc_flag)
+    }
+
     // Redoを押した数をカウントする
     let freeze_history_redo_tap_count = 0
 

@@ -255,7 +255,7 @@
     })
 
     // リトライ・Undo・Redoする前に確認ダイアログを出す機能
-    document.getElementById('getcontinuation').addEventListener('click', function () {
+    const getcontinuationEvent = function () {
         for (const target of ['retry', 'undo', 'redo']) {
             let origin = document.querySelector('#' + target)
             if (origin.getAttribute('data-clone') === '1') {
@@ -319,7 +319,10 @@
             origin.style.visibility = 'hidden'
             parent.insertBefore(clone, origin)
         }
-    })
+    }
+    for (const getcontinuation of ['getcontinuation', 'getcontinuation_chat']) {
+        document.getElementById(getcontinuation).addEventListener('click', getcontinuationEvent)
+    }
 
     // デフォルトのスクロールを無効化
     const originalScrollTop = window.jQuery.fn.init.prototype.scrollTop
